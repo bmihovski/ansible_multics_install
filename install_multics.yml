@@ -1,0 +1,48 @@
+---
+# Install multics and it's dependencies on ubuntu
+- name: Install multics
+  gather_facts: false
+  hosts: server1
+  vars:
+    - multics_archive: multics.r84.rar
+    - multics_dest: /usr/local/bin/
+    - multics_bin: multics.x64
+    - unrar_cmd: 'unrar e -n{{ multics_bin }} -o+ /tmp/{{ multics_archive }} {{ multics_dest }}'
+    - check_version_installed: Multi CardServer r84
+  tasks:
+    - block:
+      - name: Update cache and install required packages
+        apt:
+          update_cache: true
+          name: '{{ item }}'
+        with_items:
+          - libc6-dev
+          - unrar
+       
+    - block:
+      - name: Transfer multics to the server
+        copy:
+          src: './files/{{ multics_archive }}'
+          dest: /tmp
+      - name: Remove old multics
+        file: 
+          path: '{{ multics_dest }}/{{ multics_bin }}'
+          state: absent
+      - name: Extract multics
+        command: '{{ unrar_cmd }}'
+      - name: Setup file permissions to multics
+        file: 
+          path: '{{ multics_dest }}/{{ multics_bin }}'
+          mode: 0755
+          
+    - block:
+      - name: Force stop running multics
+        shell: 'killall -9 {{ multics_bin }}'
+      - name: Check new version installed
+        command: '{{ multics_bin }} -h'
+        register: multics_version
+      - name: Assert correct version installed
+        assert:
+          that:
+            - "'{{ check_version_installed }}' in multics_version.stdout"
+...
