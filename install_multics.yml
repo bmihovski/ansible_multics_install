@@ -18,6 +18,11 @@
         with_items:
           - libc6-dev
           - unrar
+          - daemontools
+          - daemontools-run
+          - lighttpd
+          - dos2unix
+          - bsdtar
        
     - block:
       - name: Transfer multics to the server
@@ -28,13 +33,55 @@
         file: 
           path: '{{ multics_dest }}/{{ multics_bin }}'
           state: absent
+      - name: Create multics conf dir
+        file: 
+          path: '/var/etc/'
+          state: directory
       - name: Extract multics
         command: '{{ unrar_cmd }}'
       - name: Setup file permissions to multics
         file: 
           path: '{{ multics_dest }}/{{ multics_bin }}'
           mode: 0755
+      - name: Transfer startup file to destination
+        copy:
+          src: './files/run'
+          dest: '/etc/service/multics/'
+          directory_mode: true
+          mode: 1755
+      - name: Transfer logrotate file to destination
+        copy:
+          src: './files/multics'
+          dest: '/etc/logrotate.d/'
+
+    - block:
+      - name: Setup lighttpd conf
+        replace:
+          path: '/etc/lighttpd/lighttpd.conf'
+          regexp: '{{ item[0] }}'
+          replace: '{{ item[1] }}'
+        with_together:
+          - [ '^server.document-root        = "/var/www/html"$', '^server.port                 = 80$' ]
+          - [ 'server.document-root        = "/var/www/manager"', 'server.port                 = 50080' ]
+      - name: Setup fastcgi symlinks
+        file:
+          src: '{{ item[0] }}'
+          dest: '{{ item[1] }}'
+          state: link    
+        with_together:
+          - [ '/etc/lighttpd/conf-available/10-fastcgi.conf', '/etc/lighttpd/conf-available/15-fastcgi-php.conf' ]
+          - [ '/etc/lighttpd/conf-enabled/10-fastcgi.conf', '/etc/lighttpd/conf-enabled/15-fastcgi-php.conf' ]
           
+    - block:
+      - name: Setup chrotabs
+        blockinfile:
+          path: '/etc/crontab'
+          block: |
+            0 7 * * *      root    python /root/epg/epg_grab.py
+            0 9 * * *       root    wget -qO- software77.net/geo-ip/?DL=2 | bsdtar -xf- -C /var/etc/
+            0 4 * * *       root     /var/www/manager/script/check_fline_restart_cccam
+            0 8 * * *       root     php /var/www/manager/multicache.php > /dev/null
+      
     - block:
       - name: Force stop running multics
         shell: 'killall -9 {{ multics_bin }}'

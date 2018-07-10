@@ -1,0 +1,9 @@
+/var/tmp/multics.log {
+        hourly
+        su root
+        rotate 0
+        size 10M
+        copytruncate
+        missingok
+        notifempty
+}
