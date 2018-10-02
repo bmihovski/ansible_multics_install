@@ -80,7 +80,7 @@
             0 7 * * *      root    python /root/epg/epg_grab.py
             0 9 * * *       root    wget -qO- software77.net/geo-ip/?DL=2 | bsdtar -xf- -C /var/etc/
             0 4 * * *       root     /var/www/manager/script/check_fline_restart_cccam
-            0 8 * * *       root     php /var/www/manager/multicache.php > /dev/null
+            0 0 * * *       root     php /var/www/manager/multicache.php > /dev/null
       
     - block:
       - name: Force stop running multics
