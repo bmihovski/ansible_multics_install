@@ -92,4 +92,40 @@
         assert:
           that:
             - "'{{ check_version_installed }}' in multics_version.stdout"
+            
+    - block:
+      - name: Flush existing firewall rules
+        iptables:
+          flush: true
+          
+      - name: Firewall rule - limit ports access
+        iptables:
+          chain: INPUT
+          protocol: tcp
+          source: '{{ item[0] }}'
+          destination_port: '{{ item[1] }}'
+          jump: ACCEPT
+        loop: "{{ [sp_host, amd_host, cc_host, api_host]|zip([sp_port, amd_port, cc_port, api_port])|list }}"
+          
+      - name: Firewall rule - limit outside access
+        iptables:
+          chain: INPUT
+          protocol: tcp
+          source: '0.0.0.0/0'
+          destination_port: '{{ item }}'
+          jump: DROP
+        loop:
+          - '{{ sp_port }}'
+          - '{{ amd_port }}'
+          - '{{ cc_port }}'
+          - '{{ api_port }}'
+          
+      - name: Install netfilter-persistent and iptables-persistent packages
+        package:
+          name: "{{item}}"
+          state: present
+        loop:
+          - iptables-persistent
+          - netfilter-persistent
+
 ...
