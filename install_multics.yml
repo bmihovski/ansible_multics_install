@@ -4,11 +4,10 @@
   gather_facts: false
   hosts: server1
   vars:
-    - multics_archive: multics.r84.rar
+    - multics_archive: multics-r82-hellboy-V14-beta-dirty.zip
     - multics_dest: /usr/local/bin/
     - multics_bin: multics.x64
-    - unrar_cmd: 'unrar e -n{{ multics_bin }} -o+ /tmp/{{ multics_archive }} {{ multics_dest }}'
-    - check_version_installed: Multi CardServer r84
+    - check_version_installed: Multi CardServer r82-hellboy-V14-beta-28-gebba9b5 based on the work by evileyes (http://www.infosat.org)
   tasks:
     - block:
       - name: Update cache and install required packages
@@ -17,38 +16,21 @@
           name: '{{ item }}'
         with_items:
           - libc6-dev
-          - unrar
-          - daemontools
-          - daemontools-run
           - lighttpd
           - dos2unix
           - bsdtar
        
     - block:
-      - name: Transfer multics to the server
-        copy:
+      - name: Extract {{ multics_archive }} into {{ multics_dest }}
+        unarchive:
           src: './files/{{ multics_archive }}'
-          dest: /tmp
-      - name: Remove old multics
-        file: 
-          path: '{{ multics_dest }}/{{ multics_bin }}'
-          state: absent
+          dest: {{ multics_dest }}
+          mode: 0755
+          list_files: true
       - name: Create multics conf dir
         file: 
           path: '/var/etc/'
           state: directory
-      - name: Extract multics
-        command: '{{ unrar_cmd }}'
-      - name: Setup file permissions to multics
-        file: 
-          path: '{{ multics_dest }}/{{ multics_bin }}'
-          mode: 0755
-      - name: Transfer startup file to destination
-        copy:
-          src: './files/run'
-          dest: '/etc/service/multics/'
-          directory_mode: true
-          mode: 1755
       - name: Transfer logrotate file to destination
         copy:
           src: './files/multics'
@@ -80,11 +62,27 @@
             0 7 * * *      root    python /root/epg/epg_grab.py
             0 9 * * *       root    wget -qO- software77.net/geo-ip/?DL=2 | bsdtar -xf- -C /var/etc/
             0 4 * * *       root     /var/www/manager/script/check_fline_restart_cccam
-            0 0 * * *       root     php /var/www/manager/multicache.php > /dev/null
+
+    - block:
+      - name: Copy Multics system.d scripts
+        copy:
+          src: 'files/system.d/multics.service'
+          dest: /etc/systemd/system
+
+      - name: Reload systemd configuration
+        command: systemctl daemon-reload
+    
+      - name: Start and enable Multics
+        service:
+          name: multics
+          state: started
+          enabled: true
       
     - block:
       - name: Force stop running multics
-        shell: 'killall -9 {{ multics_bin }}'
+        service:
+          name: multics
+          state: restarted
       - name: Check new version installed
         command: '{{ multics_bin }} -h'
         register: multics_version
@@ -105,7 +103,7 @@
           source: '{{ item[0] }}'
           destination_port: '{{ item[1] }}'
           jump: ACCEPT
-        loop: "{{ [sp_host, amd_host, cc_host, api_host]|zip([sp_port, amd_port, cc_port, api_port])|list }}"
+        loop: "{{ [sp_host, amd_host, cc_host, api_host, telnet_host]|zip([sp_port, amd_port, cc_port, api_port, telnet_port])|list }}"
           
       - name: Firewall rule - limit outside access
         iptables:
@@ -119,6 +117,7 @@
           - '{{ amd_port }}'
           - '{{ cc_port }}'
           - '{{ api_port }}'
+          - '{{ telnet_port }}'
           
       - name: Install netfilter-persistent and iptables-persistent packages
         package:
