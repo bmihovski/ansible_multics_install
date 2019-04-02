@@ -1,0 +1,3 @@
+#!/bin/sh
+
+exec /usr/local/bin/multics.x64 -f -C /var/etc/multics.cfg
