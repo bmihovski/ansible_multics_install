@@ -7,7 +7,7 @@
     - multics_archive: multics-r82-hellboy-V14-beta-dirty.zip
     - multics_dest: /usr/local/bin/
     - multics_bin: multics.x64
-    - check_version_installed: Multi CardServer r82-hellboy-V14-beta-28-gebba9b5 based on the work by evileyes (http://www.infosat.org)
+    - check_version_installed: Multi CardServer r82-hellboy-V17-beta-41-g138227f based on the work by evileyes (http://www.infosat.org)
   tasks:
     - block:
       - name: Update cache and install required packages
@@ -16,6 +16,8 @@
           name: '{{ item }}'
         with_items:
           - libc6-dev
+          - daemontools
+          - daemontools-run
           - lighttpd
           - dos2unix
           - bsdtar
@@ -31,6 +33,12 @@
         file: 
           path: '/var/etc/'
           state: directory
+      - name: Transfer startup file to destination
+        copy:
+          src: './files/run'
+          dest: '/etc/service/multics/'
+          directory_mode: true
+          mode: 1755
       - name: Transfer logrotate file to destination
         copy:
           src: './files/multics'
@@ -62,27 +70,11 @@
             0 7 * * *      root    python /root/epg/epg_grab.py
             0 9 * * *       root    wget -qO- software77.net/geo-ip/?DL=2 | bsdtar -xf- -C /var/etc/
             0 4 * * *       root     /var/www/manager/script/check_fline_restart_cccam
-
-    - block:
-      - name: Copy Multics system.d scripts
-        copy:
-          src: 'files/system.d/multics.service'
-          dest: /etc/systemd/system
-
-      - name: Reload systemd configuration
-        command: systemctl daemon-reload
-    
-      - name: Start and enable Multics
-        service:
-          name: multics
-          state: started
-          enabled: true
+            0 0 * * *       root     php /var/www/manager/multicache.php > /dev/null
       
     - block:
       - name: Force stop running multics
-        service:
-          name: multics
-          state: restarted
+        shell: 'killall -9 {{ multics_bin }}'
       - name: Check new version installed
         command: '{{ multics_bin }} -h'
         register: multics_version
